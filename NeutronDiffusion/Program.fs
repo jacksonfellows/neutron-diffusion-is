@@ -59,24 +59,21 @@ let stl_file_to_obj (stl : StereoLithography.STLDocument) : WavefrontObj.ObjFile
     ) stl.Facets
     obj
 
-[<EntryPoint>]
-let main argv =
+let add_texture_to_model (model : WavefrontObj.ObjFile) mat_lib_name texture_file_name mat_name =
+    model.MaterialLibraries.Add mat_lib_name
+    let mat_map = WavefrontObj.ObjMaterialMap texture_file_name
+    let mat = WavefrontObj.ObjMaterial mat_name
+    mat.DiffuseMap <- mat_map
+    let mat_file = WavefrontObj.ObjMaterialFile ()
+    mat_file.Materials.Add mat
+    for face in model.Faces do
+        face.MaterialName <- mat_name
+    mat_file
+
+let week3 () =
     let model = File.OpenRead "baseparaffinblock.stl"
               |> StereoLithography.STLDocument.Read
               |> stl_file_to_obj
-
-    let mat_lib_name = "output.mtl"
-    model.MaterialLibraries.Add mat_lib_name
-
-    let texture_file_name = "demo_texture2.png"
-    let mat_map = WavefrontObj.ObjMaterialMap texture_file_name
-
-    let mat_name = "textured_material"
-    let mat = WavefrontObj.ObjMaterial mat_name
-    mat.DiffuseMap <- mat_map
-
-    let mat_file = WavefrontObj.ObjMaterialFile ()
-    mat_file.Materials.Add mat
 
     // TODO: can they not be 1 or 0?
     let tex_coords = [(0.01f,0.01f);(0.01f,0.99f);(0.99f,0.01f);(0.99f,0.99f)]
@@ -84,14 +81,20 @@ let main argv =
         WavefrontObj.ObjVector3 (x,y,0.0f) |> model.TextureVertices.Add
 
     for face in model.Faces do
-        face.MaterialName <- mat_name
-        let offset = if model.Vertices.[face.Vertices.[0].Vertex].Position.Y < 10.0f then 1 else 2
+        let offset = if model.Vertices.[face.Vertices.[0].Vertex-1].Position.Y < 10.0f then 1 else 2
         for t_i in [0..2] do // assume that each face has 3 vertices
             let mutable triplet = face.Vertices.[t_i]
             triplet.Texture <- t_i + offset
             face.Vertices.[t_i] <- triplet
 
+    let mat_lib_name = "output.mtl"
+    let texture_file_name = "demo_texture2.png"
+    let mat_name = "textured_material"
+    let mat_file = add_texture_to_model model mat_lib_name texture_file_name mat_name
+
     File.OpenWrite mat_lib_name |> mat_file.WriteTo
     File.OpenWrite "output.obj" |> model.WriteTo
 
+[<EntryPoint>]
+let main argv =
     0 // return an integer exit code
