@@ -39,6 +39,59 @@ let week2 () =
             let cv = std_dev / mean
             printfn "%f,%f,%f,%f,%f,%f" sigma (1.0/sigma) mean variance std_dev cv
 
+open System.IO
+open QuantumConcepts.Formats
+open JeremyAnsel.Media
+
+let stl_vert_to_obj (stl_vert : StereoLithography.Vertex) : WavefrontObj.ObjVertex =
+    WavefrontObj.ObjVertex (stl_vert.X, stl_vert.Y, stl_vert.Z)
+
+let stl_file_to_obj (stl : StereoLithography.STLDocument) : WavefrontObj.ObjFile =
+    let obj = WavefrontObj.ObjFile ()
+    // TODO: avoid exporting duplicate vertices
+    Seq.iteri (fun f_n (facet : StereoLithography.Facet) ->
+        let face = WavefrontObj.ObjFace ()
+        Seq.iteri (fun v_off (vertex : StereoLithography.Vertex) ->
+            stl_vert_to_obj vertex |> obj.Vertices.Add
+            WavefrontObj.ObjTriplet (f_n * 3 + v_off + 1,0,0) |> face.Vertices.Add
+        ) facet.Vertices
+        obj.Faces.Add face
+    ) stl.Facets
+    obj
+
 [<EntryPoint>]
 let main argv =
+    let model = File.OpenRead "baseparaffinblock.stl"
+              |> StereoLithography.STLDocument.Read
+              |> stl_file_to_obj
+
+    let mat_lib_name = "output.mtl"
+    model.MaterialLibraries.Add mat_lib_name
+
+    let texture_file_name = "demo_texture2.png"
+    let mat_map = WavefrontObj.ObjMaterialMap texture_file_name
+
+    let mat_name = "textured_material"
+    let mat = WavefrontObj.ObjMaterial mat_name
+    mat.DiffuseMap <- mat_map
+
+    let mat_file = WavefrontObj.ObjMaterialFile ()
+    mat_file.Materials.Add mat
+
+    // TODO: can they not be 1 or 0?
+    let tex_coords = [(0.01f,0.01f);(0.01f,0.99f);(0.99f,0.01f);(0.99f,0.99f)]
+    for x,y in tex_coords do
+        WavefrontObj.ObjVector3 (x,y,0.0f) |> model.TextureVertices.Add
+
+    for face in model.Faces do
+        face.MaterialName <- mat_name
+        let offset = if model.Vertices.[face.Vertices.[0].Vertex].Position.Y < 10.0f then 1 else 2
+        for t_i in [0..2] do // assume that each face has 3 vertices
+            let mutable triplet = face.Vertices.[t_i]
+            triplet.Texture <- t_i + offset
+            face.Vertices.[t_i] <- triplet
+
+    File.OpenWrite mat_lib_name |> mat_file.WriteTo
+    File.OpenWrite "output.obj" |> model.WriteTo
+
     0 // return an integer exit code
