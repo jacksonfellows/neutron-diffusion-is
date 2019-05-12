@@ -6,7 +6,7 @@ open AABB
 
 type Tri = { tri:Vector3*Vector3*Vector3; index:int }
 
-let intersect_tri { o=o; dir=dir } { tri=(va,vb,vc); index=index } =
+let intersectTri { o=o; dir=dir } { tri=(va,vb,vc); index=index } =
     let ab = vb - va
     let ac = vc - va
     let pvec = Vector3.Cross(dir, ac)
@@ -28,17 +28,17 @@ let intersect_tri { o=o; dir=dir } { tri=(va,vb,vc); index=index } =
     else
         Some (t,index)
     
-let build_aabb_tri { tri=(va,vb,vc) } =
-    let epsilon_vec = Vector3.One * epsilon;
-    { min=Vector3.Min(va,Vector3.Min(vb,vc)) - epsilon_vec; max=Vector3.Max(va,Vector3.Max(vb,vc)) + epsilon_vec }
+let buildAabbTri { tri=(va,vb,vc) } =
+    let epsilonVec = Vector3.One * epsilon;
+    { min=Vector3.Min(va,Vector3.Min(vb,vc)) - epsilonVec; max=Vector3.Max(va,Vector3.Max(vb,vc)) + epsilonVec }
 
-let get_centroid { tri=(a,b,c) } = (a + b + c) / 3.0f
+let getCentroid { tri=(a,b,c) } = (a + b + c) / 3.0f
 
-let intersect_tris tris ray =
-    match Array.choose (intersect_tri ray) tris with
+let intersectTris tris ray =
+    match Array.choose (intersectTri ray) tris with
     | [||] -> None
     | arr -> Array.minBy fst arr |> Some
 
-let get_aabb tris =
-    let aabbs = Array.map build_aabb_tri tris
+let getAabb tris =
+    let aabbs = Array.map buildAabbTri tris
     (Array.reduce (+) aabbs, aabbs)
