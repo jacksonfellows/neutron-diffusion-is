@@ -1,16 +1,11 @@
 ﻿// Learn more about F# at http://fsharp.org
 
-// open System
+open System
 // open FsAlg.Generic
 
 // type Ray = { Origin: Vector<float>; Dir: Vector<float> }
-// 
-// let randomDir() =
-//     let theta = rnd.NextDouble() * 2.0 * Math.PI
-//     let phi = rnd.NextDouble() * 2.0 - 1.0 |> acos
-//     vector [| cos theta * sin phi; sin theta * sin phi; cos phi |]
 
-let rnd = System.Random()
+let rnd = System.Random ()
 
 // calculate a rolling mean and variance of a sequence
 let calc_mean_variance xs =
@@ -97,7 +92,6 @@ let week3 () =
 
 open System.Numerics
 open System.Drawing
-open System
 
 type Texture =
     { bitmap:Bitmap
@@ -218,6 +212,84 @@ let week4 () =
     File.OpenWrite mat_lib_name |> mat_file.WriteTo
     File.OpenWrite "week4.obj" |> model.WriteTo
 
+open Helpers
+open AABB
+open Tri
+open BVH
+
+let build_tri (vertices : Vector3 array) (face : WavefrontObj.ObjFace) index =
+    let [va;vb;vc] = List.init 3 (fun i -> vertices.[face.Vertices.[i].Vertex-1])
+    let tri = (va,vb,vc)
+    // TODO: I may need to add/subtract eps from the AABB
+    { tri=tri; index=index }
+
+let random_dir () =
+    // TODO: is this generator biased?
+    let theta = rnd.NextDouble() * 2.0 * Math.PI |> float32
+    let phi = rnd.NextDouble() * 2.0 - 1.0 |> acos |> float32
+    Vector3 (cos theta * sin phi, sin theta * sin phi, cos phi)
+
+// TESTS:
+
+let rec nodes_contain_children bvh =
+    match bvh with
+    | BVHNode (aabb,children) ->
+        [||] = Array.filter (get_bvh_aabb >> contains aabb >> not) children &&
+            [||] = Array.filter (nodes_contain_children >> not) children
+    | BVHLeaf (aabb,tris) ->
+        [] = List.filter (build_aabb_tri >> contains aabb >> not) tris
+
+let rec get_all_tris bvh =
+    match bvh with
+    | BVHNode (_,children) -> Array.fold (fun tris child -> get_all_tris child @ tris) [] children
+    | BVHLeaf (_,tris) -> tris
+
 [<EntryPoint>]
 let main argv =
+    // let model = File.OpenRead "baseparaffinblock.stl"
+    let model = File.OpenRead "sphere.stl"
+              |> StereoLithography.STLDocument.Read
+              |> stl_file_to_obj
+
+    let texture_file_name = "texture_week5.bmp"
+    let mat_lib_name = "week5.mtl"
+    let mat_name = "textured_material"
+
+    let vertices = [| for vertex in model.Vertices do yield Vector3(vertex.Position.X,vertex.Position.Y,vertex.Position.Z) |]
+    let tris = [| for face,i in Seq.zip model.Faces {0..model.Faces.Count} do yield build_tri vertices face i |]
+
+    let bvh = build_bvh tris
+
+    // printfn "%A" bvh
+    // printfn "nodes contain children: %b" (nodes_contain_children bvh)
+    // let all_tris = get_all_tris bvh
+    // printfn "# tris: %d, # bvh_tris: %d" tris.Length all_tris.Length
+    // let sorter { index=i } = i
+    // List.sortBy sorter (Array.toList tris) = List.sortBy sorter all_tris
+    //     |> printfn "tris are the same: %b"
+
+    using (add_texture model (10,10) 20) (fun texture ->
+        for _ in [1..100000] do
+            let o = Vector3.Zero + Vector3.UnitZ * 20.0f
+            let dir = random_dir ()
+            let ray = { o=o; dir=dir }
+            // let tris_int = intersect_tris tris ray
+            let bvh_int = intersect_bvh ray bvh
+            // if tris_int <> bvh_int then
+                // printfn "%A <> %A with ray %A" tris_int bvh_int ray
+            // match intersect_tris tris ray with
+            // match intersect_bvh ray bvh with
+            match bvh_int with
+            | Some (dist,i) ->
+                let point = o + dir * dist
+                let uv = get_uv_coords tris.[i].tri (texture.get_coords i) point
+                set_tex_coord texture uv Color.Blue
+            | None -> ()
+        File.OpenWrite texture_file_name |> fun stream -> texture.bitmap.Save (stream,Imaging.ImageFormat.Bmp)
+    )
+
+    let mat_file = add_texture_to_model model mat_lib_name texture_file_name mat_name
+
+    File.OpenWrite mat_lib_name |> mat_file.WriteTo
+    File.OpenWrite "week5.obj" |> model.WriteTo
     0 // return an integer exit code
