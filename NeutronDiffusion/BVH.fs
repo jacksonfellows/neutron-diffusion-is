@@ -78,6 +78,7 @@ let buildBvh tris =
             let newAabb = List.map (fun i -> aabbs.[i]) indices |> List.reduce (+)
             let newTris = List.map (fun i -> tris.[i]) indices
             BVHLeaf (newAabb,newTris)
+        | _ -> failwith "found neither octree node or leaf in BVH construction"
 
     buildBvhFromOctree octree
 

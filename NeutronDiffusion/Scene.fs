@@ -147,11 +147,14 @@ let getUvCoords ((va,vb,vc) : Vector3*Vector3*Vector3) ((ta,tb,tc) : Vector2*Vec
     ta * a1 + tb * a2 + tc * a3
 
 let buildTri (vertices : Vector3 array) (face : WavefrontObj.ObjFace) index =
-    let [va;vb;vc] = List.init 3 (fun i -> vertices.[face.Vertices.[i].Vertex-1])
-    let tri = (va,vb,vc)
-    { tri=tri; index=index }
+    match List.init 3 (fun i -> vertices.[face.Vertices.[i].Vertex-1]) with
+    | [va;vb;vc] -> let tri = (va,vb,vc) in { tri=tri; index=index }
+    | _ -> failwith "invalid number of vertices (/=3)"
 
-let vector3FromArray [|x;y;z|] = Vector3(x,y,z)
+let vector3FromArray a =
+    match a with
+    | [|x;y;z|] -> Vector3(x,y,z)
+    | _ -> failwith "array has /= 3 values"
 
 let buildScene sceneFilePath name =
     let sceneFile = SceneFile.Parse(File.ReadAllText(sceneFilePath))

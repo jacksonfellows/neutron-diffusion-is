@@ -24,8 +24,9 @@ let calcCrossSection (pairs : array<float<eV> * float<barn>>) (energy : float<eV
             Some <| linearInterpolate pairs.[upperIndex-1] pairs.[upperIndex] energy
 
 let readCrossSection material typ =
-    let readLine (line : string) = let [|energy;crossSection|] = line.Split [|','|]
-                                   (float energy) * 1.0<eV>,(float crossSection) * 1.0<barn>
+    let readLine (line : string) = match line.Split [|','|] with
+                                    | [|energy;crossSection|] -> (float energy) * 1.0<eV>,(float crossSection) * 1.0<barn>
+                                    | _ -> failwith "pointwise csv has more than two fields"
     let pairs = "cross_sections/csv/" + typ + "/" + material |> File.ReadLines |> Seq.toArray |> Array.map readLine
     calcCrossSection pairs
 
