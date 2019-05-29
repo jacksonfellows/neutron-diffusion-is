@@ -31,7 +31,7 @@ type SceneFile = JsonProvider<SceneSample, InferTypesFromValues=false>
 
 type Material = { mat:string; number_density:float<amg> }
 type Intersection = { distance:float<m>; point:Vector3; dest:(Material * int) option }
-type Scene = { intersectScene:Ray -> Intersection option; intersectObj:Ray -> int -> Intersection option; write:unit -> unit }
+type Scene = { intersectScene:Ray -> Intersection option; intersectObj:Ray -> int -> Intersection option; write:unit -> unit; materials:Material [] }
 
 let stlVertToObj (stlVert : StereoLithography.Vertex) : WavefrontObj.ObjVertex =
     WavefrontObj.ObjVertex (stlVert.X, stlVert.Y, stlVert.Z)
@@ -257,5 +257,6 @@ let buildScene sceneFilePath name =
 
             File.OpenWrite matLibName |> matFile.WriteTo
             File.OpenWrite (name + ".obj") |> objFile.WriteTo
-        )
+        );
+        materials=materials
     }

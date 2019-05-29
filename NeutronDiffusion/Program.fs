@@ -20,13 +20,19 @@ let pathLength (sigma : float</m>) () : float<m> =
 let main argv =
     let neutrons = int argv.[0]
 
-    // TODO: figure out which cross section I need
-    let crossSections = readCrossSections "2631"
+    let scene = buildScene "test_scene_2.json" "week7_2"
+
+    let crossSectionsMap : Map<string,CrossSection> =
+        Seq.map (fun material -> material.mat) scene.materials
+        |> Seq.distinct
+        |> Seq.map (fun mat -> mat,readCrossSections mat)
+        |> Map.ofSeq
+
+    // printfn "cross sections map: %A" crossSectionsMap
 
     // TODO: change energy as I collide with things
     let energy = 2.45e6<eV> // is this the starting energy?
 
-    let scene = buildScene "test_scene.json" "week7_3"
     for _ in [1..neutrons] do
         // assuming that I start outside of all objects in the scene
         let mutable pastDir = randomDir()
@@ -38,6 +44,7 @@ let main argv =
                 | None -> // we are outside of all objects -> no need to look at cross sections
                     scene.intersectScene { o=point; dir=pastDir }
                 | Some (material,obj) ->
+                    let crossSections = (crossSectionsMap.TryFind material.mat).Value
                     let totalMicro = (crossSections.getTotal energy).Value
                     let totalMacro = totalMicro * InvM3PerAmg * material.number_density * M2PerBarn
                     let distanceTraveled = pathLength totalMacro ()
