@@ -29,7 +29,6 @@ let intersectTri { o=o; dir=dir } { tri=(va,vb,vc); index=index } =
         Some (t,index)
     
 let buildAabbTri { tri=(va,vb,vc) } =
-    let epsilonVec = Vector3.One * epsilon;
     { min=Vector3.Min(va,Vector3.Min(vb,vc)) - epsilonVec; max=Vector3.Max(va,Vector3.Max(vb,vc)) + epsilonVec }
 
 let getCentroid { tri=(a,b,c) } = (a + b + c) / 3.0f
