@@ -205,6 +205,7 @@ let buildScene sceneFilePath name =
     let bvh = buildBvh tris
     let bvhs = Array.map buildBvh aOfTris
 
+    // TODO: pass dims in on creation?
     let texture = addTexture objFile (10,10) 20
     let textureFileName = name + ".bmp"
 
