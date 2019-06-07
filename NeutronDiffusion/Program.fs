@@ -1,11 +1,10 @@
 ﻿open System
 open System.Numerics
+open System.IO
 open Helpers
 open Scene
 open CrossSections
 open FSharp.Data.UnitSystems.SI.UnitSymbols // lets me see unit symbols in editor
-open System.Collections.Generic
-open XPlot.Plotly
 open MathNet.Numerics.Distributions
 
 let rnd = System.Random ()
@@ -41,9 +40,14 @@ let elasticScatter (neutronDir : Vector3) (neutronEnergy : float<eV>) =
 
 [<EntryPoint>]
 let main argv =
-    let neutrons = int argv.[0]
+    let sceneDir = argv.[0]
+    let sceneFile = argv.[1]
+    let outputName = argv.[2]
+    let neutrons = int argv.[3]
 
-    let scene = buildScene "test_scene.json" "week8"
+    printfn "Building scene..."
+    let scene = buildScene sceneDir sceneFile outputName
+    printfn "...done"
 
     let crossSectionsMap : Map<string,CrossSection> =
         Seq.map (fun material -> material.mat) scene.materials
@@ -56,18 +60,32 @@ let main argv =
     // TODO: change energy as I collide with things
     let startingEnergy = 2.45e6<eV> // is this the starting energy?
 
-    let escaped = new List<float>()
-    let absorbed = new List<float>()
+    let mutable numEscaped = 0
+    let mutable numAbsorbed = 0
 
-    for _ in [1..neutrons] do
+    use logFile = new StreamWriter(outputName + ".log")
+    // Event IDs: 1 = Elastic Scattering, 2 = Absorption, 3 = Escape
+    fprintfn logFile "Neutron #,Event #,Event ID,Pos,In Dir,Out Dir,In Energy (eV),Out Energy (eV)"
+
+    let showV (v3 : Vector3) =
+        sprintf "%f %f %f" v3.X v3.Y v3.Z
+
+    printfn "Scattering..."
+    for neutronNum in [1..neutrons] do
+        // printfn "#%d" i
         // assuming that I start outside of all objects in the scene
+        let mutable eventNum = 0
         let mutable pastDir = randomDir()
         let mutable intersection = scene.intersectScene { o=Vector3.Zero; dir=pastDir }
         let mutable justAbsorbed = false
         let mutable energy = startingEnergy
 
+        let logLine = fprintfn logFile "%d,%d,%d,%s,%s,%s,%s,%s"
+
         while intersection <> None do
             intersection <- Option.bind (fun { point=point; distance=distance; dest=dest } ->
+                let logLineSA eventType newDir newEnergy =
+                    logLine neutronNum eventNum eventType (showV point) (showV pastDir) newDir (string energy) newEnergy
                 match dest with
                 | None -> // we are outside of all objects -> no need to look at cross sections
                     scene.intersectScene { o=point; dir=pastDir }
@@ -77,67 +95,36 @@ let main argv =
                     let totalMacro = totalMicro * InvM3PerAmg * material.number_density * M2PerBarn
                     let distanceTraveled = pathLength totalMacro ()
                     if distanceTraveled < distance then // we are doing something!
+                        eventNum <- eventNum + 1
+
                         let elasticMicro = (crossSections.getElastic energy).Value
                         let elasticMacro = elasticMicro * InvM3PerAmg * material.number_density * M2PerBarn
                         if (elasticMacro / totalMacro) > rnd.NextDouble() then // elastic scattering
                             let newDir,newEnergy = elasticScatter pastDir energy
+                            logLineSA 1 (showV newDir) (string newEnergy)
                             pastDir <- newDir
                             energy <- newEnergy
                             scene.intersectObj { o=point; dir=pastDir } obj
                         else // absorbed
-                            absorbed.Add(float energy)
+                            numAbsorbed <- numAbsorbed + 1
                             justAbsorbed <- true
+                            logLineSA 2 "NA" "NA"
                             None
                     else // just keep going
                         scene.intersectObj { o=point; dir=pastDir } obj
             ) intersection
 
         if not justAbsorbed then
-            escaped.Add(float energy)
+            numEscaped <- numEscaped + 1
+            logLine neutronNum eventNum 3 "NA" "NA" (showV pastDir) "NA" (string energy)
+
+    printfn "...done"
+
+    printfn "Writing scene..."
     scene.write()
+    printfn "...done"
 
-    printfn "%d neutrons escaped" escaped.Count
-    printfn "%d neutrons were absorbed" absorbed.Count
-
-    let escapedData =
-        Histogram(
-            x = escaped,
-            name = "escaped",
-            opacity = 0.75,
-            marker = Marker(
-                color = "red"
-            )
-        )
-
-    let absorbedData =
-        Histogram(
-            x = absorbed,
-            name = "absorbed",
-            opacity = 0.75,
-            marker = Marker(
-                color = "blue"
-            )
-        )
-
-    let layout =
-        Layout(
-            barmode = "stack",
-            title = "Energies of Escaped and Absorbed Neutrons",
-            xaxis = Xaxis(
-                title = "Energy (eV)",
-                ``type`` = "log",
-                autorange = true
-            ),
-            yaxis = Yaxis(
-                title = "Count",
-                ``type`` = "log",
-                autorange = true
-            )
-        )
-
-    [escapedData; absorbedData]
-    |> Chart.Plot
-    |> Chart.WithLayout layout
-    |> Chart.Show
+    printfn "%d neutrons escaped" numEscaped
+    printfn "%d neutrons were absorbed" numAbsorbed
 
     0

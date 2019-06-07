@@ -156,8 +156,8 @@ let vector3FromArray a =
     | [|x;y;z|] -> Vector3(x,y,z)
     | _ -> failwith "array has /= 3 values"
 
-let buildScene sceneFilePath name =
-    let sceneFile = SceneFile.Parse(File.ReadAllText(sceneFilePath))
+let buildScene baseDir sceneFileName name =
+    let sceneFile = SceneFile.Parse(File.ReadAllText(baseDir + "/" + sceneFileName))
 
     let materials = [| for obj in sceneFile do yield { mat=obj.Material; number_density=obj.NumberDensityAmg * 1.0<amg> } |]
 
@@ -165,7 +165,7 @@ let buildScene sceneFilePath name =
         [| for obj in sceneFile do
             let offsetVec = vector3FromArray <| Array.map float32 obj.Offset
 
-            let objModel = File.OpenRead obj.File |> StereoLithography.STLDocument.Read |> stlFileToObj
+            let objModel = File.OpenRead (baseDir + "/" + obj.File) |> StereoLithography.STLDocument.Read |> stlFileToObj
 
             let objVertices = [| for v in objModel.Vertices do yield offsetVec + Vector3(v.Position.X,v.Position.Y,v.Position.Z) |]
             let objTris = [| for face,i in Seq.zip objModel.Faces {0..objModel.Faces.Count} do yield (buildTri objVertices face i,face) |]
@@ -206,7 +206,7 @@ let buildScene sceneFilePath name =
     let bvhs = Array.map buildBvh aOfTris
 
     // TODO: pass dims in on creation?
-    let texture = addTexture objFile (10,10) 20
+    let texture = addTexture objFile (10,10) 1000
     let textureFileName = name + ".bmp"
 
     let matLibName = name + ".mtl"
