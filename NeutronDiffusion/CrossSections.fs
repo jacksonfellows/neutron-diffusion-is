@@ -2,7 +2,7 @@ module CrossSections
 
 open System
 open System.IO
-open Helpers
+open Constants
 
 // is having partially applied lookups here a good idea?
 // should this return barns?

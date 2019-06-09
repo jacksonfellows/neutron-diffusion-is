@@ -1,7 +1,7 @@
 module Tri
 
 open System.Numerics
-open Helpers
+open Constants
 open AABB
 open Ray
 

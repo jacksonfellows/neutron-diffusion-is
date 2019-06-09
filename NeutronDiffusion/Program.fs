@@ -1,7 +1,7 @@
 ﻿open System
 open System.Numerics
 open System.IO
-open Helpers
+open Constants
 open Scene
 open CrossSections
 open FSharp.Data.UnitSystems.SI.UnitSymbols // lets me see unit symbols in editor
@@ -18,11 +18,6 @@ let randomDir () =
 
 let pathLength (sigma : float</m>) () : float<m> =
     (-1.0 / sigma) * log (rnd.NextDouble())
-
-let boltzmann = 8.61733333353e-5<eV/K>
-let roomTemp = 293.0<K>
-let neutronMass = 1.008664f // u
-let protonMass = 1.007276f // u
 
 let elasticScatter (neutronDir : Vector3) (neutronEnergy : float<eV>) =
     let protonEnergy = normalRnd.Sample() * (boltzmann * roomTemp / 2.0)

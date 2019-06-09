@@ -11,7 +11,7 @@ open FSharp.Data.UnitSystems.SI.UnitSymbols
 open QuantumConcepts.Formats
 open JeremyAnsel.Media
 
-open Helpers
+open Constants
 open Ray
 open Tri
 open BVH
