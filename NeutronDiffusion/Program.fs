@@ -1,11 +1,13 @@
-﻿open System
-open System.Numerics
+open System
 open System.IO
-open Constants
-open Scene
-open CrossSections
+open System.Numerics
+
 open FSharp.Data.UnitSystems.SI.UnitSymbols // lets me see unit symbols in editor
 open MathNet.Numerics.Distributions
+
+open Constants
+open CrossSections
+open Scene
 
 let rnd = System.Random ()
 let normalRnd = Normal ()

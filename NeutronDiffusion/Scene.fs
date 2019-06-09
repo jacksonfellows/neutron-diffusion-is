@@ -1,20 +1,19 @@
 module Scene
 
 open System
+open System.Drawing
 open System.IO
 open System.Numerics
-open System.Drawing
 
 open FSharp.Data
 open FSharp.Data.UnitSystems.SI.UnitSymbols
-
-open QuantumConcepts.Formats
 open JeremyAnsel.Media
+open QuantumConcepts.Formats
 
+open BVH
 open Constants
 open Ray
 open Tri
-open BVH
 
 [<Literal>]
 let SceneSample = """

@@ -1,8 +1,9 @@
 module Tri
 
 open System.Numerics
-open Constants
+
 open AABB
+open Constants
 open Ray
 
 type Tri = { tri:Vector3*Vector3*Vector3; index:int }
