@@ -3,7 +3,6 @@ module Helpers
 open System.Numerics
 open FSharp.Data.UnitSystems.SI.UnitSymbols
 
-type Ray = { o:Vector3; dir:Vector3 }
 let epsilon = 1e-3f
 let epsilonVec = Vector3.One * epsilon;
 

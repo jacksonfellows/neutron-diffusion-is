@@ -12,6 +12,7 @@ open QuantumConcepts.Formats
 open JeremyAnsel.Media
 
 open Helpers
+open Ray
 open Tri
 open BVH
 
@@ -231,7 +232,7 @@ let buildScene baseDir sceneFileName name =
             intersectBvh ray bvh |>
             Option.map (fun (dist,i) ->
                 let hitObj = getHitObj i
-                let point = ray.o + ray.dir * dist
+                let point = ray.PointOn dist
                 let uv = getUvCoords tris.[i].tri (texture.getCoords i) point
                 setTexCoord texture uv Color.White
                 // TODO: is the model in cm? also, Vector3s can't have units (to my knowledge)
@@ -244,7 +245,7 @@ let buildScene baseDir sceneFileName name =
                 insideFailures <- insideFailures + 1
             insideTotal <- insideTotal + 1
             Option.map (fun (dist,i) ->
-                let point = ray.o + ray.dir * dist
+                let point = ray.PointOn dist
                 let uv = getUvCoords tris.[i].tri (texture.getCoords i) point
                 setTexCoord texture uv Color.Blue
                 { distance=float dist * 1.0<m>; point = point + ray.dir*epsilon; dest=None }

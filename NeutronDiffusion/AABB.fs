@@ -1,7 +1,7 @@
 module AABB
 
 open System.Numerics
-open Helpers
+open Ray
 
 type AABB =
     { min:Vector3; max:Vector3 }
