@@ -156,8 +156,9 @@ let vector3FromArray a =
     | [|x;y;z|] -> Vector3(x,y,z)
     | _ -> failwith "array has /= 3 values"
 
-let buildScene baseDir sceneFileName name =
-    let sceneFile = SceneFile.Parse(File.ReadAllText(baseDir + "/" + sceneFileName))
+let buildScene sceneFileName buildOutputName =
+    let baseDir = Path.GetDirectoryName(sceneFileName)
+    let sceneFile = SceneFile.Parse(File.ReadAllText(sceneFileName))
 
     let materials = [| for obj in sceneFile do yield { mat=obj.Material; number_density=obj.NumberDensityAmg * 1.0<amg> } |]
 
@@ -165,7 +166,7 @@ let buildScene baseDir sceneFileName name =
         [| for obj in sceneFile do
             let offsetVec = vector3FromArray <| Array.map float32 obj.Offset
 
-            let objModel = File.OpenRead (baseDir + "/" + obj.File) |> StereoLithography.STLDocument.Read |> stlFileToObj
+            let objModel = File.OpenRead (Path.Combine(baseDir,obj.File)) |> StereoLithography.STLDocument.Read |> stlFileToObj
 
             let objVertices = [| for v in objModel.Vertices do yield offsetVec + Vector3(v.Position.X,v.Position.Y,v.Position.Z) |]
             let objTris = [| for face,i in Seq.zip objModel.Faces {0..objModel.Faces.Count} do yield (buildTri objVertices face i,face) |]
@@ -207,10 +208,11 @@ let buildScene baseDir sceneFileName name =
 
     // TODO: pass dims in on creation?
     let texture = addTexture objFile (10,10) 1000
-    let textureFileName = name + ".bmp"
 
-    let matLibName = name + ".mtl"
-    let matFile = addTextureToModel objFile matLibName textureFileName (name + "_textured_material")
+    let textureFileName = buildOutputName ".bmp"
+
+    let matLibName = buildOutputName ".mtl"
+    let matFile = addTextureToModel objFile (Path.GetFileName(matLibName)) (Path.GetFileName(textureFileName)) "textured_material"
 
     let getHitObj i =
         let index = Array.BinarySearch (triCounts, i)
@@ -257,7 +259,7 @@ let buildScene baseDir sceneFileName name =
             texture.bitmap.Dispose()
 
             File.OpenWrite matLibName |> matFile.WriteTo
-            File.OpenWrite (name + ".obj") |> objFile.WriteTo
+            File.OpenWrite (buildOutputName ".obj") |> objFile.WriteTo
         );
         materials=materials
     }

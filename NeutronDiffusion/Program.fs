@@ -5,6 +5,7 @@ open System.Numerics
 open FSharp.Data.UnitSystems.SI.UnitSymbols // lets me see unit symbols in editor
 open MathNet.Numerics.Distributions
 
+open Arguments
 open Constants
 open CrossSections
 open Scene
@@ -35,15 +36,19 @@ let elasticScatter (neutronDir : Vector3) (neutronEnergy : float<eV>) =
 
     Vector3.Normalize(scattered), 1.0<eV> * float (scattered.Length())
 
+
 [<EntryPoint>]
 let main argv =
-    let sceneDir = argv.[0]
-    let sceneFile = argv.[1]
-    let outputName = argv.[2]
-    let neutrons = int argv.[3]
+    let settings = readSettings argv
+
+    if not (Directory.Exists(settings.outputDir)) then
+        printfn "creating directory %s for output" settings.outputDir
+        Directory.CreateDirectory(settings.outputDir) |> ignore
+
+    let buildOutputName suffix = Path.Combine(settings.outputDir,settings.outputName + suffix)
 
     printfn "Building scene..."
-    let scene = buildScene sceneDir sceneFile outputName
+    let scene = buildScene settings.sceneFile buildOutputName
     printfn "...done"
 
     let crossSectionsMap : Map<string,CrossSection> =
@@ -60,7 +65,7 @@ let main argv =
     let mutable numEscaped = 0
     let mutable numAbsorbed = 0
 
-    use logFile = new StreamWriter(outputName + ".log")
+    use logFile = new StreamWriter(buildOutputName ".log")
     // Event IDs: 1 = Elastic Scattering, 2 = Absorption, 3 = Escape
     fprintfn logFile "Neutron #,Event #,Event ID,Pos,In Dir,Out Dir,In Energy (eV),Out Energy (eV)"
 
@@ -68,7 +73,7 @@ let main argv =
         sprintf "%f %f %f" v3.X v3.Y v3.Z
 
     printfn "Scattering..."
-    for neutronNum in [1..neutrons] do
+    for neutronNum in [1..settings.neutrons] do
         // printfn "#%d" i
         // assuming that I start outside of all objects in the scene
         let mutable eventNum = 0
