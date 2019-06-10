@@ -117,6 +117,7 @@ let main argv =
             ) intersection
 
         if not justAbsorbed then
+            eventNum <- eventNum + 1
             numEscaped <- numEscaped + 1
             logLine neutronNum eventNum 3 "NA" "NA" (showV pastDir) "NA" (string energy)
 
