@@ -15,7 +15,7 @@ def read_stl(path):
     if path in stls:
         return stls[path]
     (normals,facets) = [],[]
-    with open(path) as stl_file:
+    with open(os.path.join(os.path.dirname(scene_filename),path)) as stl_file:
         stl_lines = stl_file.readlines()
         for i in range(1,len(stl_lines)-1,7):
             facet = stl_lines[i:i+7]
@@ -58,4 +58,4 @@ for block in scene_file:
     new_facets = [ [ [ v+o for (v,o) in zip(vertex,offset) ] for vertex in facet] for facet in facets ]
     scene_stl.extend(zip(normals,new_facets))
 
-write_stl(scene_stl, scene_filename, os.path.splitext(scene_filename)[0] + '.stl')
+write_stl(scene_stl, scene_filename, os.path.splitext(os.path.basename(scene_filename))[0] + '.stl')
