@@ -36,6 +36,10 @@ let elasticScatter (neutronDir : Vector3) (neutronEnergy : float<eV>) =
 
     Vector3.Normalize(scattered), 1.0<eV> * float (scattered.Length())
 
+let showV (v3 : Vector3) =
+    sprintf "%f %f %f" v3.X v3.Y v3.Z
+
+let startingEnergy = 2.45e6<eV> // is this the starting energy?
 
 [<EntryPoint>]
 let main argv =
@@ -59,67 +63,61 @@ let main argv =
 
     // printfn "cross sections map: %A" crossSectionsMap
 
-    // TODO: change energy as I collide with things
-    let startingEnergy = 2.45e6<eV> // is this the starting energy?
-
+    let mutable numScattered = 0
     let mutable numEscaped = 0
     let mutable numAbsorbed = 0
+    let mutable numEscapedFromObj = 0
 
     use logFile = new StreamWriter(buildOutputName ".log")
-    // Event IDs: 1 = Elastic Scattering, 2 = Absorption, 3 = Escape
+    // Event IDs: 1 = Elastic Scattering, 2 = Absorption, 3 = Escape, 4 = Escape Obj (Error)
     fprintfn logFile "Neutron #,Event #,Event ID,Pos,In Dir,Out Dir,In Energy (eV),Out Energy (eV)"
+    let logLine = fprintfn logFile "%d,%d,%d,%s,%s,%s,%s,%s"
 
-    let showV (v3 : Vector3) =
-        sprintf "%f %f %f" v3.X v3.Y v3.Z
+    let escape num eventNum pos dir energy =
+        numEscaped <- numEscaped + 1
+        logLine num eventNum 3 (showV pos) (showV dir) "NA" (string energy) "NA"
+
+    let escapeObj num eventNum pos dir energy =
+        numEscapedFromObj <- numEscapedFromObj + 1
+        logLine num eventNum 4 (showV pos) (showV dir) "NA" (string energy) "NA"
+
+    let recordElasticScatter num eventNum pos dir newDir energy newEnergy =
+        numScattered <- numScattered + 1
+        logLine num eventNum 1 (showV pos) (showV dir) (showV newDir) (string energy) (string newEnergy)
+
+    let absorb num eventNum pos dir energy =
+        numAbsorbed <- numAbsorbed + 1
+        logLine num eventNum 2 (showV pos) (showV dir) "NA" (string energy) "NA"
+
+    let rec scatter num eventNum (pos : Vector3) (dir : Vector3) (energy : float<eV>) (inside : (Material * int) option) =
+        let intersection = match inside with
+                           | None -> scene.intersectScene { o=pos; dir=dir }
+                           | Some (mat,obj) -> scene.intersectObj { o=pos; dir=dir } obj
+        match intersection with
+        | None -> if inside.IsNone then escape num eventNum pos dir energy else escapeObj num eventNum pos dir energy
+        | Some { point=intPos; distance=distance; dest=dest } ->
+            match inside with
+            | None -> scatter num eventNum intPos dir energy dest
+            | Some (mat,obj) ->
+                let crossSections = (crossSectionsMap.TryFind mat.mat).Value
+                let totalMicro = (crossSections.getTotal energy).Value
+                let totalMacro = totalMicro * InvM3PerAmg * mat.number_density * M2PerBarn
+                let distanceTraveled = pathLength totalMacro ()
+                if distanceTraveled < distance then // we are doing something!
+                    let elasticMicro = (crossSections.getElastic energy).Value
+                    let elasticMacro = elasticMicro * InvM3PerAmg * mat.number_density * M2PerBarn
+                    if (elasticMacro / totalMacro) > rnd.NextDouble() then // elastic scattering
+                        let newDir,newEnergy = elasticScatter dir energy
+                        recordElasticScatter num eventNum pos dir newDir energy newEnergy
+                        scatter num (eventNum + 1) (pos + dir * (float32 distanceTraveled)) newDir newEnergy inside // inside not dest because we didn't leave
+                    else // absorbed
+                        absorb num eventNum pos dir energy
+                else // just keep going
+                    scatter num eventNum intPos dir energy dest
 
     printfn "Scattering..."
     for neutronNum in [1..settings.neutrons] do
-        // printfn "#%d" i
-        // assuming that I start outside of all objects in the scene
-        let mutable eventNum = 0
-        let mutable pastDir = randomDir()
-        let mutable intersection = scene.intersectScene { o=Vector3.Zero; dir=pastDir }
-        let mutable justAbsorbed = false
-        let mutable energy = startingEnergy
-
-        let logLine = fprintfn logFile "%d,%d,%d,%s,%s,%s,%s,%s"
-
-        while intersection <> None do
-            intersection <- Option.bind (fun { point=point; distance=distance; dest=dest } ->
-                let logLineSA eventType newDir newEnergy =
-                    logLine neutronNum eventNum eventType (showV point) (showV pastDir) newDir (string energy) newEnergy
-                match dest with
-                | None -> // we are outside of all objects -> no need to look at cross sections
-                    scene.intersectScene { o=point; dir=pastDir }
-                | Some (material,obj) ->
-                    let crossSections = (crossSectionsMap.TryFind material.mat).Value
-                    let totalMicro = (crossSections.getTotal energy).Value
-                    let totalMacro = totalMicro * InvM3PerAmg * material.number_density * M2PerBarn
-                    let distanceTraveled = pathLength totalMacro ()
-                    if distanceTraveled < distance then // we are doing something!
-                        eventNum <- eventNum + 1
-
-                        let elasticMicro = (crossSections.getElastic energy).Value
-                        let elasticMacro = elasticMicro * InvM3PerAmg * material.number_density * M2PerBarn
-                        if (elasticMacro / totalMacro) > rnd.NextDouble() then // elastic scattering
-                            let newDir,newEnergy = elasticScatter pastDir energy
-                            logLineSA 1 (showV newDir) (string newEnergy)
-                            pastDir <- newDir
-                            energy <- newEnergy
-                            scene.intersectObj { o=point; dir=pastDir } obj
-                        else // absorbed
-                            numAbsorbed <- numAbsorbed + 1
-                            justAbsorbed <- true
-                            logLineSA 2 "NA" "NA"
-                            None
-                    else // just keep going
-                        scene.intersectObj { o=point; dir=pastDir } obj
-            ) intersection
-
-        if not justAbsorbed then
-            eventNum <- eventNum + 1
-            numEscaped <- numEscaped + 1
-            logLine neutronNum eventNum 3 "NA" "NA" (showV pastDir) "NA" (string energy)
+        scatter neutronNum 0 Vector3.Zero (randomDir()) startingEnergy None
 
     printfn "...done"
 
@@ -127,7 +125,9 @@ let main argv =
     scene.write()
     printfn "...done"
 
+    printfn "%d neutrons scattered" numScattered
     printfn "%d neutrons escaped" numEscaped
     printfn "%d neutrons were absorbed" numAbsorbed
+    printfn "%d neutrons escaped from objects (bad)" numEscapedFromObj
 
     0
